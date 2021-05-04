@@ -138,8 +138,10 @@ class train_test_model:
             y_preds_np = np.array(y_preds)
 
         y_test_np = np.array(y_test)
-
-        auc_scores = roc_auc_score(y_test_np, y_preds_np, average=None)
         
-        return auc_scores
+        return y_test_np, y_preds_np
+    
+#         auc_scores = roc_auc_score(y_test_np, y_preds_np, average=None)
+        
+#         return auc_scores
         
