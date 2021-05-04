@@ -55,7 +55,7 @@ class preprocessing:
 
         return real_review_dict, fake_review_dict
 
-    def make_del_word_lst(self, fake_review_dict, real_review_dict, threshold=0.8):
+    def make_del_word_lst(self, fake_review_dict, real_review_dict, threshold):
         '''단어들의 갯수를 이용해, 어떤 단어를 제거할지 찾는 함수'''
         del_word_lst = []
         sum_real_review = sum(real_review_dict.values())
@@ -71,7 +71,8 @@ class preprocessing:
         
                 if (fake_cnt / real_cnt) >= threshold:
                     del_word_lst.append(ele)
-
+        
+        print(del_word_lst)
         return del_word_lst
 
     def make_review_lst(self, del_word_lst):
@@ -153,5 +154,20 @@ class preprocessing:
         df_train = df_train.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
         df_val = df_val.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
         df_test = df_test.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
+        
+        real_review_dict, fake_review_dict = self.make_word_dict(df_train)
+        
+        del_word_lst = self.make_del_word_lst(fake_review_dict, real_review_dict, threshold=threshold)
+        print(f'len(del_word_lst) : {len(del_word_lst)}')
+        
+        train_review_lst = self.make_review_lst(df_train, del_word_lst)
+        val_review_lst = self.make_review_lst(df_val, del_word_lst)
+        test_review_lst = self.make_review_lst(df_test, del_word_lst)
+        
+        df_train['review'] = train_review_lst
+        df_val['review'] = val_review_lst
+        df_test['review'] = test_review_lst
+
+        
         
         return df_train, df_val, df_test
