@@ -157,22 +157,6 @@ class preprocessing:
         
         real_review_dict, fake_review_dict = self.make_word_dict(df_train)
         
-<<<<<<< HEAD
-        del_word_lst = self.make_del_word_lst(fake_review_dict, real_review_dict, threshold=threshold)
-        print(f'len(del_word_lst) : {len(del_word_lst)}')
-        
-        train_review_lst = self.make_review_lst(df_train, del_word_lst)
-        val_review_lst = self.make_review_lst(df_val, del_word_lst)
-        test_review_lst = self.make_review_lst(df_test, del_word_lst)
-        
-        df_train['review'] = train_review_lst
-        df_val['review'] = val_review_lst
-        df_test['review'] = test_review_lst
-
-        
-        
-        return df_train, df_val, df_test
-=======
         stop_words = set(stopwords.words('english'))
         del_word_lst = self.make_del_word_lst(fake_review_dict, real_review_dict, threshold=self.threshold)
            
@@ -187,10 +171,4 @@ class preprocessing:
         df_val['review'] = val_review_lst
         df_test['review'] = test_review_lst
         
-
-<<<<<<< HEAD
         return df_train, df_val, df_test, (real_review_dict, fake_review_dict)
-=======
-        return df_train, df_val, df_test
->>>>>>> 588be138e2b559d2e874fd1250d099135bc8f9a0
->>>>>>> e193d6397bef8e678f82c3d5490629e9a8ceb11e
