@@ -27,6 +27,7 @@ def targets_to_tensor(df, target_columns):
 def tokenize_and_pad_text_bert(df, device, model_class, tokenizer_class, pretrained_weights, max_seq=128, batch_size=16, target_columns=['label']):
     tokenizer = tokenizer_class.from_pretrained(pretrained_weights)
     bert_model = model_class.from_pretrained(pretrained_weights).to(device)
+    bert_model.eval()
 
     data_indices = tokenize_and_pad_text(df, max_seq, tokenizer)
     data_indices = data_indices.to(device)

@@ -34,9 +34,9 @@ class preprocessing:
             # word_lst = df_train.review[i].lower().split()
             
             sentence = df_train.review[i].lower()
-            sentence = re.sub('[\d]+', 'NUMBER', sentence)
-            sentence = re.sub('[^A-Za-z\s]', '', sentence)
-            sentence = re.sub('[NUMBER]+', 'NUMBER', sentence)
+            sentence = re.sub('[\d]+', ' ', sentence)
+            sentence = re.sub('[^A-Za-z\s]', ' ', sentence)
+            # sentence = re.sub('[NUMBER]+', ' ', sentence)
             word_lst = sentence.split()
 
             if df_train.label[i] == 1:
@@ -80,7 +80,7 @@ class preprocessing:
         for sentence in tqdm(df.review):
             sentence = sentence.lower()
 
-            sentence = re.sub('[\d]+', '<NUM>', sentence)
+            sentence = re.sub('[\d]+', ' ', sentence)
             sentence = re.sub('[^A-Za-z\s]', '', sentence)
             # sentence = re.sub('[<NUM>]+', '<NUM>', sentence) # if you don't want to delete the number
             sentence = re.sub('[<NUM>]+', '', sentence) # if you want to delete the number
@@ -104,7 +104,7 @@ class preprocessing:
         
         for review in self.dataframe['review']:
             if len(review) > 512:
-                review_lst.append(review[-512:])
+                review_lst.append(review[:512])
                 continue
             review_lst.append(review)
 
@@ -171,4 +171,4 @@ class preprocessing:
         df_test['review'] = test_review_lst
         
 
-        return df_train, df_val, df_test
+        return df_train, df_val, df_test, (real_review_dict, fake_review_dict)
