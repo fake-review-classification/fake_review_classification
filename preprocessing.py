@@ -1,10 +1,12 @@
-from collections import defaultdict
+import os
+import json
 import re
-
+from collections import defaultdict
 from tqdm import tqdm
 
 import pandas as pd
 from nltk.corpus import stopwords
+
 
 class preprocessing:
     def __init__(self, df, threshold=1, random_seed=42):
@@ -88,6 +90,41 @@ class preprocessing:
             new_review_lst.append(''.join(map(lambda x: x + ' ' if x not in del_word_lst else '', sentence.split())))
 
         return new_review_lst
+    
+    def add_del_word(threshold, word_list, dist_type, folder_path='./json_folder'):
+        '''threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
+        add_del_word_set = set()
+
+        if dist_type == 'cosine similarity':
+            idx2 = 0
+        elif dist_type == 'euclidean distance':
+            idx2 = 1
+        else:
+            return set()
+
+        for word in word_list:
+
+            file = word + '.json'
+
+            with open(os.path.join(folder_path, file), 'r') as f:
+                dist = json.load(f)[word]
+
+            word_dist_lst = list(json_data.items())
+            if idx2 == 0:
+                word_dist_lst.sort(reverse=True, key=lambda x: x[1][idx2])
+                for dist_info in word_dist_lst:
+                    if dist_info[1][idx2] < threshold:
+                        break
+
+                    add_del_word_set.add(dist_info[0])
+            else:
+                word_dist_lst.sort(key=lambda x: x[1][idx2])
+                for dist_info in word_dist_lst:
+                    if dist_info[1][idx2] > threshold:
+                        break
+                    add_del_word_set.add(dist_info[0])
+
+        return add_del_word_set
 
     def preprocessing_all(self, kold=0):
         ''''''
