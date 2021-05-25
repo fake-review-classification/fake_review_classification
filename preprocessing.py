@@ -91,7 +91,7 @@ class preprocessing:
 
         return new_review_lst
     
-    def add_del_word(threshold, word_list, dist_type, folder_path='./json_folder'):
+    def add_del_word(self, threshold, word_list, dist_type, folder_path='./json_folder'):
         '''threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
         add_del_word_set = set()
 
@@ -107,7 +107,7 @@ class preprocessing:
             file = word + '.json'
 
             with open(os.path.join(folder_path, file), 'r') as f:
-                dist = json.load(f)[word]
+                json_data = json.load(f)[word]
 
             word_dist_lst = list(json_data.items())
             if idx2 == 0:
