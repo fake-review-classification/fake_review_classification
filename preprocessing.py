@@ -74,7 +74,6 @@ class preprocessing:
                 if (fake_cnt / real_cnt) >= threshold:
                     del_word_lst.append(ele)
         
-        print(del_word_lst)
         return del_word_lst
 
     def make_review_lst(self, df, del_word_lst):
