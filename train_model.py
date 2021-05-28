@@ -131,7 +131,7 @@ class train_test_model:
                 val_loss /= batch
                 val_losses.append(val_loss)
 
-            print(f'Epoch {epoch+1} Train loss: {train_losses[-1]:.2f}. Validation loss: {val_losses[-1]:.2f}. Elapsed time: {elapsed:.2f}.')
+            print(f'Epoch {epoch}/{self.n_epochs-1} Train loss: {train_losses[-1]:.2f}. Validation loss: {val_losses[-1]:.2f}. Elapsed time: {elapsed:.2f}.')
 
             if patience != None:
                 if val_loss < best_val_loss:
@@ -150,6 +150,8 @@ class train_test_model:
                     plt.show()
 
                     return
+                
+                count += 1
                         
         plt.plot(train_losses, label="Training loss")
         plt.plot(val_losses, label="Validation loss")

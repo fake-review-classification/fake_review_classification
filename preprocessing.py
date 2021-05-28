@@ -1,3 +1,5 @@
+import random
+import numpy as np
 import os
 import json
 import re
@@ -9,10 +11,15 @@ from nltk.corpus import stopwords
 
 
 class preprocessing:
-    def __init__(self, df, threshold=1, random_seed=42):
+    def __init__(self, df, ratio_threshold=1, dist_type='cosine similarity', dist_threshold=1, random_seed=42):
         self.dataframe = df
-        self.threshold = threshold
+        self.ratio_threshold = ratio_threshold
+        self.dist_type = dist_type
+        self.dist_threshold = dist_threshold
         self.random_seed = 42
+
+        random.seed(self.random_seed)
+        np.random.seed(self.random_seed)
 
     def make_id_dict(self):
         '''한 유저가 리뷰를 몇개를 작성했는지, 한 상품에 대해서 얼마나 많은 리뷰가 작성됐는지 카운트 하는 코드 
@@ -57,9 +64,9 @@ class preprocessing:
 
         return real_review_dict, fake_review_dict
 
-    def make_del_word_lst(self, fake_review_dict, real_review_dict, threshold):
-        '''단어들의 갯수를 이용해, 어떤 단어를 제거할지 찾는 함수'''
-        del_word_lst = []
+    def make_del_word_list(self, fake_review_dict, real_review_dict, ratio_threshold):
+        '''단어들의 분포 비율을 이용해, 어떤 단어를 제거할지 찾는 함수'''
+        del_word_list = []
         sum_real_review = sum(real_review_dict.values())
         sum_fake_review = sum(fake_review_dict.values())
 
@@ -71,12 +78,12 @@ class preprocessing:
                 if real_cnt < fake_cnt:
                     real_cnt, fake_cnt = (fake_cnt, real_cnt)
         
-                if (fake_cnt / real_cnt) >= threshold:
-                    del_word_lst.append(ele)
+                if (fake_cnt / real_cnt) >= ratio_threshold:
+                    del_word_list.append(ele)
         
-        return del_word_lst
+        return del_word_list
 
-    def make_review_lst(self, df, del_word_lst):
+    def make_review_lst(self, df, del_word_list):
         '''특수문자, 숫자를 제거한 뒤 위에서 찾은 단어들 삭제하는 함수'''
         new_review_lst = []
         for sentence in tqdm(df.review):
@@ -86,40 +93,41 @@ class preprocessing:
             sentence = re.sub('[^A-Za-z\s]', '', sentence)
             # sentence = re.sub('[<NUM>]+', '<NUM>', sentence) # if you don't want to delete the number
             sentence = re.sub('[<NUM>]+', '', sentence) # if you want to delete the number
-            new_review_lst.append(''.join(map(lambda x: x + ' ' if x not in del_word_lst else '', sentence.split())))
+            new_review_lst.append(''.join(map(lambda x: x + ' ' if x not in del_word_list else '', sentence.split())))
 
         return new_review_lst
     
-    def add_del_word(self, threshold, word_list, dist_type, folder_path='./json_folder'):
-        '''threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
+    @staticmethod
+    def dist_del_word(dist_threshold, word_list, dist_type=None, folder_path='./json_folder'):
+        '''dist_threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
         add_del_word_set = set()
-
-        if dist_type == 'cosine similarity':
+        
+        if dist_type == 'cosine similarity' or dist_type == 'c':
             idx2 = 0
-        elif dist_type == 'euclidean distance':
+        elif dist_type == 'euclidean distance' or dist_type == 'e':
             idx2 = 1
         else:
             return set()
 
-        for word in word_list:
+        for word in tqdm(word_list):
 
             file = word + '.json'
 
             with open(os.path.join(folder_path, file), 'r') as f:
                 json_data = json.load(f)[word]
 
-            word_dist_lst = list(json_data.items())
+            word_dist_list = list(json_data.items())
             if idx2 == 0:
-                word_dist_lst.sort(reverse=True, key=lambda x: x[1][idx2])
-                for dist_info in word_dist_lst:
-                    if dist_info[1][idx2] < threshold:
+                word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
+                for dist_info in word_dist_list:
+                    if dist_info[1][idx2] < dist_threshold:
                         break
 
                     add_del_word_set.add(dist_info[0])
             else:
-                word_dist_lst.sort(key=lambda x: x[1][idx2])
-                for dist_info in word_dist_lst:
-                    if dist_info[1][idx2] > threshold:
+                word_dist_list.sort(key=lambda x: x[1][idx2])
+                for dist_info in word_dist_list:
+                    if dist_info[1][idx2] > dist_threshold:
                         break
                     add_del_word_set.add(dist_info[0])
 
@@ -146,6 +154,7 @@ class preprocessing:
             review_lst.append(review)
 
         self.dataframe['review'] = review_lst
+        del review_lst
 
         new_label_lst = []
 
@@ -156,6 +165,7 @@ class preprocessing:
                 new_label_lst.append(1)
 
         self.dataframe['label'] = new_label_lst
+        del new_label_lst
 
         self.dataframe = self.dataframe.sample(frac=1, random_state=self.random_seed)
         self.dataframe = self.dataframe.reset_index(drop=True)
@@ -194,17 +204,25 @@ class preprocessing:
         real_review_dict, fake_review_dict = self.make_word_dict(df_train)
         
         stop_words = set(stopwords.words('english'))
-        del_word_lst = self.make_del_word_lst(fake_review_dict, real_review_dict, threshold=self.threshold)
-           
-        del_word_lst = list(stop_words | set(del_word_lst))
-        print(f'len(del_word_lst): {len(del_word_lst)}')
+        del_word_list = self.make_del_word_list(fake_review_dict, real_review_dict, ratio_threshold=self.ratio_threshold)
 
-        train_review_lst = self.make_review_lst(df_train, del_word_lst)
-        val_review_lst = self.make_review_lst(df_val, del_word_lst)
-        test_review_lst = self.make_review_lst(df_test, del_word_lst)
+        print('checking word distance...')
+        dist_word_set = self.dist_del_word(self.dist_threshold, del_word_list, dist_type=self.dist_type, folder_path='./json_folder')
 
-        df_train['review'] = train_review_lst
-        df_val['review'] = val_review_lst
-        df_test['review'] = test_review_lst
-        
+        del_word_list = list(stop_words | set(del_word_list) | dist_word_set)
+
+        print(f'len(del_word_list): {len(del_word_list)}')
+
+        train_review_list = self.make_review_lst(df_train, del_word_list)
+        val_review_list = self.make_review_lst(df_val, del_word_list)
+        test_review_list = self.make_review_lst(df_test, del_word_list)
+
+        df_train['review'] = train_review_list
+        df_val['review'] = val_review_list
+        df_test['review'] = test_review_list
+
+        del train_review_list
+        del val_review_list
+        del test_review_list     
+
         return df_train, df_val, df_test, (real_review_dict, fake_review_dict)

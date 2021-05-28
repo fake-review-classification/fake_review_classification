@@ -1,25 +1,22 @@
 import logging
-
 from platform import python_version
 import random
+import argparse
 
 import numpy as np
-
 import torch
 import sklearn
 import torch.nn as nn
 import pandas as pd
 import matplotlib
-
-from torch.autograd import Variable
-
 import transformers
+from torch.autograd import Variable
+from sklearn.metrics import roc_auc_score
 
 from preprocessing import preprocessing
 from tokenize_and_pad_text import *
 from train_model import KimCNN, train_test_model
 
-from sklearn.metrics import roc_auc_score
 
 random_seed = 42
 
@@ -53,9 +50,11 @@ kernel_sizes = [2, 3, 4]
 dropout = 0.5
 static = True
 
-n_epochs = 10
+n_epochs = 50
+patience = 10
 batch_size = 64
 lr = 0.001
+k_fold = 5
 optimizer = torch.optim.Adam
 loss_fn = nn.BCELoss()
 
@@ -79,13 +78,17 @@ logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR)
 data_path = '../reviews.csv'
 data_name = data_path.split('/')[-1]
 print(f'use {data_name} data', end='\n')
+df = pd.read_csv(data_path)
 
 def main(threshold):
-    print(f'start threshold {threshold}!!!')
-    preprocessing_class = preprocessing(df)
+    if threshold == 1:
+        print('test with all word!!!')
+    else:
+        print(f'start threshold {threshold}!!!')
+    preprocessing_class = preprocessing(df, threshold=threshold)
 
-    df_train, df_val, df_test = preprocessing_class.preprocessing_all()
-
+    df_train, df_val, df_test, (real_dict, fake_dict) = preprocessing_class.preprocessing_all()
+    
     print('make train data ...')
     x_train, y_train = tokenize_and_pad_text_bert(df_train, device, model_class, tokenizer_class, pretrained_weights,
                                                 max_seq=max_seq, batch_size=bert_batch_size, target_columns=target_columns)
@@ -102,29 +105,39 @@ def main(threshold):
     embed_dim = x_train.shape[2]
     class_num = y_train.shape[1]
 
-    model = KimCNN(
-        embed_num=embed_num,
-        embed_dim=embed_dim,
-        class_num=class_num,
-        kernel_num=kernel_num,
-        kernel_sizes=kernel_sizes,
-        dropout=dropout,
-        static=static,
-    )
-
-    model = model.to(device)
-
-    # train and test
-    review_classification_model = train_test_model(model)
-    review_classification_model.train(x_train, y_train, x_val, y_val)
-    y_test_np, y_preds_np = review_classification_model.test(x_test, y_test)
+    auc_score_list = []
     
-    auc_scores = roc_auc_score(y_test_np, y_preds_np, average=None)
+    for fold in range(k_fold):
+        model = KimCNN(
+            embed_num=embed_num,
+            embed_dim=embed_dim,
+            class_num=class_num,
+            kernel_num=kernel_num,
+            kernel_sizes=kernel_sizes,
+            dropout=dropout,
+            static=static,
+        )
 
-    print(f'threshold : {threshold},\tauc ascores : {auc_scores}')
+        model = model.to(device)
 
-    torch.cuda.empty_cache()
+        # train and test
+        review_classification_model = train_test_model(model)
+        # auc_score_list = review_classification_model.kfold_train_test(x_train, y_train, x_test, y_test, kwargs, k_fold=5)
+
+        review_classification_model.train(x_train, y_train, x_val, y_val, fold=0, patience=patience)
+        y_test_np, y_preds_np = review_classification_model.test(x_test, y_test)
+
+        auc_score = roc_auc_score(y_test_np, y_preds_np, average=None)
+        print(f'k_fold: {fold+1}/{k_fold},\tauc score: {auc_score}')
+        auc_score_list.append(auc_score)
+        
+    print(f'threshold: {threshold},\tauc score: {np.mean(auc_score_list)}, std: {np.std(auc_score_list)}')
+    return auc_score_list
 
     
 if __name__ == "__main__":
-    main(1)
+    parser = argparse.ArgumentParser(descroption='hyperparameter')
+    parser.add_argument('--threshold', '-t', type=float, default=1, help='threshold t: 0 <= t <= 1')
+    args = parser.parse_args()
+
+    main(args.threshold)
