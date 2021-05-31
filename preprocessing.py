@@ -35,7 +35,8 @@ class preprocessing:
         '''문장 전처리를 수행한 뒤, 데이터에 속한 단어들의 갯수 카운팅하는 함수'''
         self.real_review_dict = dict()
         self.fake_review_dict = dict()
-
+        self.all_word_set = set()
+        
         for i in range(df_train.shape[0]):
             # word_lst = df_train.review[i].lower().split()
             
@@ -51,17 +52,31 @@ class preprocessing:
                         self.real_review_dict[ele] += 1
                     else:
                         self.real_review_dict[ele] = 1
-
+                    
+                    self.all_word_set.add(ele)
+                    
             else:
                 for ele in word_lst:
                     if ele in self.fake_review_dict:
                         self.fake_review_dict[ele] += 1
                     else:
                         self.fake_review_dict[ele] = 1
+                        
+                    self.all_word_set.add(ele)
+            
+        print('save')
+        with open('all_word.json', 'w', encoding='utf-8') as make_file:
+            json.dump({'word': list(self.all_word_set)}, make_file, ensure_ascii=False, indent='\t')
+        print('done')
+                
 
-    def make_del_word_list(self, ratio_threshold):
+    def make_del_word_set(self, ratio_threshold):
         '''단어들의 분포 비율을 이용해, 어떤 단어를 제거할지 찾는 함수'''
-        del_word_list = []
+        del_word_set = set()
+        
+        if ratio_threshold >= 1:
+            return del_word_set
+        
         sum_real_review = sum(self.real_review_dict.values())
         sum_fake_review = sum(self.fake_review_dict.values())
 
@@ -74,9 +89,9 @@ class preprocessing:
                     real_cnt, fake_cnt = (fake_cnt, real_cnt)
         
                 if (fake_cnt / real_cnt) >= ratio_threshold:
-                    del_word_list.append(ele)
+                    del_word_set.add(ele)
         
-        return del_word_list
+        return del_word_set
 
     def make_review_lst(self, df, del_word_list):
         '''특수문자, 숫자를 제거한 뒤 위에서 찾은 단어들 삭제하는 함수'''
@@ -93,7 +108,7 @@ class preprocessing:
         return new_review_lst
     
     @staticmethod
-    def dist_del_word(word_list, dist_type=None, dist_threshold=1, folder_path='./json_folder'):
+    def dist_del_words(word_list, dist_type=None, dist_threshold=1, folder_path='./json_folder'):
         '''dist_threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
         assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', 'e', None), 'wrong dist_type'
         
@@ -116,25 +131,28 @@ class preprocessing:
             word_dist_list = list(json_data.items())
             if idx2 == 0:
                 word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
-                for dist_info in word_dist_list:
+            else:
+                word_dist_list.sort(lambda x: x[1][idx2])
+                
+            for dist_info in word_dist_list:
+                if idx2 == 0:
                     if dist_info[1][idx2] < dist_threshold:
                         break
-
-                    add_del_word_set.add(dist_info[0])
-            else:
-                word_dist_list.sort(key=lambda x: x[1][idx2])
-                for dist_info in word_dist_list:
+                else:
                     if dist_info[1][idx2] > dist_threshold:
                         break
-                    add_del_word_set.add(dist_info[0])
+                        
+                add_del_word_set.add(dist_info[0])
 
         return add_del_word_set
     
-    def check_around_words(self, word_list, threshold, dist_type=None, dist_threshold=1, folder_path='./json_folder'):
+    def check_around_words(self, word_list, around_threshold, dist_type=None, dist_threshold=1, folder_path='./json_folder', soft=True):
         '''단어의 주변 단어의 분포를 체크해, 해당 단어를 제거할지 제거하지 않을지 결정해 반환하는 함수'''
-        assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', None), 'wrong dist_type'
+        assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', 'e', None), 'wrong dist_type'
         
-        not_del_word_set = set()
+        del_word_set = set()
+        sum_real_review = sum(self.real_review_dict.values())
+        sum_fake_review = sum(self.fake_review_dict.values())
         
         if dist_type == 'cosine_similarity' or dist_type == 'c':
             idx2 = 0
@@ -156,46 +174,39 @@ class preprocessing:
             
             if idx2 == 0:
                 word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
-                for dist_info in word_dist_list:
-                    if dist_info[1][idx2] < dist_threshold:
-                        break
-                    
-                    real_value = self.real_review_dict.get(dist_info[0], 0)
-                    fake_valeu = self.fake_review_dict.get(dist_info[0], 0)
-                    
-                    real_sum += real_value
-                    fake_sun += fake_value
-                    
-                    if real_value > fake_value:
-                        real_cnt += 1
-                    else:
-                        fake_cnt += 1
-                    
             else:
                 word_dist_list.sort(key=lambda x: x[1][idx2])
-                for dist_info in word_dist_list:
+                
+            for dist_info in word_dist_list:
+                if idx2 == 0:
+                    if dist_info[1][idx2] < dist_threshold:
+                        break
+                else:
                     if dist_info[1][idx2] > dist_threshold:
                         break
-                    
-                    real_value = self.real_review_dict.get(dist_info[0], 0)
-                    fake_valeu = self.fake_review_dict.get(dist_info[0], 0)
-                    
-                    real_sum += real_value
-                    fake_sun += fake_value
-                    
-                    if real_value > fake_value:
-                        real_cnt += 1
-                    else:
-                        fake_cnt += 1
-            
-            diff = abs(real_cnt - fake_cnt)
-            if diff < threshold:
-                not_del_word_set.add(word)
+
+                real_value = self.real_review_dict.get(dist_info[0], 0) / sum_real_review
+                fake_value = self.fake_review_dict.get(dist_info[0], 0) / sum_fake_review
+
+                real_sum += real_value
+                fake_sum += fake_value
+
+                if real_value > fake_value:
+                    real_cnt += 1
+                else:
+                    fake_cnt += 1
+            if soft:
+                diff = abs(real_sum - fake_sum)
+            else:
+                diff = abs(real_cnt - fake_cnt)
+                
+            if diff < around_threshold:
+                del_word_set.add(word)
         
-        return not_del_word_set
+        return del_word_set
                     
     
-    def preprocessing_all(self, ratio_threshold=1, dist_type='cosine_similarity', dist_threshold=1):
+    def preprocessing_all(self, ratio_threshold=1, preprocessing_function=(None, None), dist_type=None, dist_threshold=1):
         ''''''
         print('make id dictionary and count id frequency of id ...')
         user_id_dict, prod_id_dict = self.make_id_dict()
@@ -266,17 +277,21 @@ class preprocessing:
         self.make_word_dict(df_train)
         
         stop_words = set(stopwords.words('english'))
-        del_word_list = self.make_del_word_list(ratio_threshold=ratio_threshold)
+        if preprocessing_function[0] != 'check_around_words':
+            del_word_set = self.make_del_word_set(ratio_threshold=ratio_threshold)
         
+        if preprocessing_function[0] == 'check_around_words':
+            print('check around')
+            all_word_list = list(self.all_word_set)
+            del_word_set = self.check_around_words(all_word_list, around_threshold=ratio_threshold, dist_type=dist_type, dist_threshold=dist_threshold, soft=preprocessing_function[1])
         
-#         print('check around')
-#         not_del_word_set = self.check_around_words(del_word_list, threshold=ratio_threshold, dist_type=dist_type, dist_threshold=dist_threshold)
-#         del_word_list = set(del_word_list) - not_del_word_set
-        
-        print('checking word distance...')
-        dist_word_set = self.dist_del_word(del_word_list, dist_type=dist_type, dist_threshold=dist_threshold)
+        if preprocessing_function[0] == 'dist_del_words':
+            print('checking word distance...')
+            dist_word_set = self.dist_del_words(list(del_word_set), dist_type=dist_type, dist_threshold=dist_threshold)
+            
+            del_word_set = del_word_set | dist_word_set
 
-        del_word_list = list(stop_words | set(del_word_list) | dist_word_set)
+        del_word_list = list(stop_words | del_word_set)
 
         print(f'len(del_word_list): {len(del_word_list)}')
 
