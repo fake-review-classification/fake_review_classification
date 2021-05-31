@@ -36,8 +36,8 @@ class preprocessing:
 
     def make_word_dict(self, df_train):
         '''문장 전처리를 수행한 뒤, 데이터에 속한 단어들의 갯수 카운팅하는 함수'''
-        real_review_dict = dict()
-        fake_review_dict = dict()
+        self.real_review_dict = dict()
+        self.fake_review_dict = dict()
 
         for i in range(df_train.shape[0]):
             # word_lst = df_train.review[i].lower().split()
@@ -50,30 +50,28 @@ class preprocessing:
 
             if df_train.label[i] == 1:
                 for ele in word_lst:
-                    if ele in real_review_dict:
-                        real_review_dict[ele] += 1
+                    if ele in self.real_review_dict:
+                        self.real_review_dict[ele] += 1
                     else:
-                        real_review_dict[ele] = 1
+                        self.real_review_dict[ele] = 1
 
             else:
                 for ele in word_lst:
-                    if ele in fake_review_dict:
-                        fake_review_dict[ele] += 1
+                    if ele in self.fake_review_dict:
+                        self.fake_review_dict[ele] += 1
                     else:
-                        fake_review_dict[ele] = 1
+                        self.fake_review_dict[ele] = 1
 
-        return real_review_dict, fake_review_dict
-
-    def make_del_word_list(self, fake_review_dict, real_review_dict, ratio_threshold):
+    def make_del_word_list(self, ratio_threshold):
         '''단어들의 분포 비율을 이용해, 어떤 단어를 제거할지 찾는 함수'''
         del_word_list = []
-        sum_real_review = sum(real_review_dict.values())
-        sum_fake_review = sum(fake_review_dict.values())
+        sum_real_review = sum(self.real_review_dict.values())
+        sum_fake_review = sum(self.fake_review_dict.values())
 
-        for ele in fake_review_dict:
-            if ele in real_review_dict:
-                real_cnt = real_review_dict[ele] / sum_real_review
-                fake_cnt = fake_review_dict[ele] / sum_fake_review
+        for ele in self.fake_review_dict:
+            if ele in self.real_review_dict:
+                real_cnt = self.real_review_dict[ele] / sum_real_review
+                fake_cnt = self.fake_review_dict[ele] / sum_fake_review
 
                 if real_cnt < fake_cnt:
                     real_cnt, fake_cnt = (fake_cnt, real_cnt)
@@ -100,11 +98,13 @@ class preprocessing:
     @staticmethod
     def dist_del_word(dist_threshold, word_list, dist_type=None, folder_path='./json_folder'):
         '''dist_threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
+        assert dist_type not in ('cosine_similarity', 'c', 'euclidean_distance')
+        
         add_del_word_set = set()
         
-        if dist_type == 'cosine similarity' or dist_type == 'c':
+        if dist_type == 'cosine_similarity' or dist_type == 'c':
             idx2 = 0
-        elif dist_type == 'euclidean distance' or dist_type == 'e':
+        elif dist_type == 'euclidean_distance' or dist_type == 'e':
             idx2 = 1
         else:
             return set()
@@ -132,7 +132,55 @@ class preprocessing:
                     add_del_word_set.add(dist_info[0])
 
         return add_del_word_set
-
+    
+    @staticmethod
+    def check_around_words(threshold, dist_threshold, word_list, dist_type=None, folder_parth='./json_folder'):
+        '''단어의 주변 단어의 분포를 체크해, 해당 단어를 제거할지 제거하지 않을지 결정해 반환하는 함수'''
+        assert dist_type not in ('cosine_similarity', 'c', 'euclidean_distance')
+        
+        del_word_set = set()
+        
+         if dist_type == 'cosine_similarity' or dist_type == 'c':
+            idx2 = 0
+        elif dist_type == 'euclidean_distance' or dist_type == 'e':
+            idx2 = 1
+        
+        for word in tqmd(word_list):
+            
+            file = word + '.json'
+            
+            with open(os.path.join(foler_path, file), 'r') as f:
+                json_data = json.load(f)[word]
+            
+            word_dist_list = list(json_data.items())
+            real_sum = 0
+            fake_sum = 0
+            
+            
+            if idx2 == 0:
+                word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
+                for dist_info in word_dist_list:
+                    if dist_info[1][idx2] < dist_threshold:
+                        break
+                    
+                    real += self.real_review_dict.get(dist_info[0], 0)
+                    fake += self.fake_review_dict.get(dist_info[0], 0)
+            
+            else:
+                word_dist_list.sort(key=lambda x: x[1][idx2])
+                for dist_info in word_dist_list:
+                    if dist_info[1][idx2] > dist_threshold:
+                        break
+                    
+                    real += self.real_review_dict.get(dist_info[0], 0)
+                    fake += self.fake_review_dict.get(dist_info[0], 0)
+                     
+            if diff < threshold:
+                del_word_set.add(word)
+        
+        return del_word_set
+                    
+    
     def preprocessing_all(self, kold=0):
         ''''''
         print('make id dictionary and count id frequency of id ...')
@@ -201,11 +249,11 @@ class preprocessing:
         df_val = df_val.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
         df_test = df_test.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
         
-        real_review_dict, fake_review_dict = self.make_word_dict(df_train)
+        # real_review_dict, fake_review_dict = self.make_word_dict(df_train)
         
         stop_words = set(stopwords.words('english'))
-        del_word_list = self.make_del_word_list(fake_review_dict, real_review_dict, ratio_threshold=self.ratio_threshold)
-
+        del_word_list = self.make_del_word_list(self.real_review_dict, self.real_review_dict, ratio_threshold=self.ratio_threshold)
+        
         print('checking word distance...')
         dist_word_set = self.dist_del_word(self.dist_threshold, del_word_list, dist_type=self.dist_type, folder_path='./json_folder')
 
@@ -225,4 +273,4 @@ class preprocessing:
         del val_review_list
         del test_review_list     
 
-        return df_train, df_val, df_test, (real_review_dict, fake_review_dict)
+        return df_train, df_val, df_test
