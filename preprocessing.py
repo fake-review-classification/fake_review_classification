@@ -11,11 +11,8 @@ from nltk.corpus import stopwords
 
 
 class preprocessing:
-    def __init__(self, df, ratio_threshold=1, dist_type='cosine similarity', dist_threshold=1, random_seed=42):
+    def __init__(self, df, random_seed=42):
         self.dataframe = df
-        self.ratio_threshold = ratio_threshold
-        self.dist_type = dist_type
-        self.dist_threshold = dist_threshold
         self.random_seed = 42
 
         random.seed(self.random_seed)
@@ -98,7 +95,7 @@ class preprocessing:
     @staticmethod
     def dist_del_word(dist_threshold, word_list, dist_type=None, folder_path='./json_folder'):
         '''dist_threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
-        assert dist_type not in ('cosine_similarity', 'c', 'euclidean_distance')
+        assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', 'e', None), 'wrong dist_type'
         
         add_del_word_set = set()
         
@@ -136,11 +133,11 @@ class preprocessing:
     @staticmethod
     def check_around_words(threshold, dist_threshold, word_list, dist_type=None, folder_parth='./json_folder'):
         '''단어의 주변 단어의 분포를 체크해, 해당 단어를 제거할지 제거하지 않을지 결정해 반환하는 함수'''
-        assert dist_type not in ('cosine_similarity', 'c', 'euclidean_distance')
+        assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', None), 'wrong dist_type'
         
-        del_word_set = set()
+        not_del_word_set = set()
         
-         if dist_type == 'cosine_similarity' or dist_type == 'c':
+        if dist_type == 'cosine_similarity' or dist_type == 'c':
             idx2 = 0
         elif dist_type == 'euclidean_distance' or dist_type == 'e':
             idx2 = 1
@@ -176,12 +173,12 @@ class preprocessing:
                     fake += self.fake_review_dict.get(dist_info[0], 0)
                      
             if diff < threshold:
-                del_word_set.add(word)
+                not_del_word_set.add(word)
         
-        return del_word_set
+        return not_del_word_set
                     
     
-    def preprocessing_all(self, kold=0):
+    def preprocessing_all(self, ratio_threshold=1, dist_type='cosine_similarity', dist_threshold=1):
         ''''''
         print('make id dictionary and count id frequency of id ...')
         user_id_dict, prod_id_dict = self.make_id_dict()
@@ -249,13 +246,13 @@ class preprocessing:
         df_val = df_val.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
         df_test = df_test.sample(frac=1, random_state=self.random_seed).reset_index(drop=True)
         
-        # real_review_dict, fake_review_dict = self.make_word_dict(df_train)
+        self.make_word_dict(df_train)
         
         stop_words = set(stopwords.words('english'))
-        del_word_list = self.make_del_word_list(self.real_review_dict, self.real_review_dict, ratio_threshold=self.ratio_threshold)
+        del_word_list = self.make_del_word_list(ratio_threshold=ratio_threshold)
         
         print('checking word distance...')
-        dist_word_set = self.dist_del_word(self.dist_threshold, del_word_list, dist_type=self.dist_type, folder_path='./json_folder')
+        dist_word_set = self.dist_del_word(dist_threshold, del_word_list, dist_type=dist_type, folder_path='./json_folder')
 
         del_word_list = list(stop_words | set(del_word_list) | dist_word_set)
 
