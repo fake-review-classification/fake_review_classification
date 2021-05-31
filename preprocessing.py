@@ -93,7 +93,7 @@ class preprocessing:
         return new_review_lst
     
     @staticmethod
-    def dist_del_word(dist_threshold, word_list, dist_type=None, folder_path='./json_folder'):
+    def dist_del_word(word_list, dist_type=None, dist_threshold=1, folder_path='./json_folder'):
         '''dist_threshold와 단어의 거리를 비교해 추가된 지울 단어 집합을 반환하는 함수'''
         assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', 'e', None), 'wrong dist_type'
         
@@ -130,8 +130,7 @@ class preprocessing:
 
         return add_del_word_set
     
-    @staticmethod
-    def check_around_words(threshold, dist_threshold, word_list, dist_type=None, folder_parth='./json_folder'):
+    def check_around_words(self, word_list, threshold, dist_type=None, dist_threshold=1, folder_path='./json_folder'):
         '''단어의 주변 단어의 분포를 체크해, 해당 단어를 제거할지 제거하지 않을지 결정해 반환하는 함수'''
         assert dist_type in ('cosine_similarity', 'c', 'euclidean_distance', None), 'wrong dist_type'
         
@@ -142,11 +141,11 @@ class preprocessing:
         elif dist_type == 'euclidean_distance' or dist_type == 'e':
             idx2 = 1
         
-        for word in tqmd(word_list):
+        for word in tqdm(word_list):
             
             file = word + '.json'
             
-            with open(os.path.join(foler_path, file), 'r') as f:
+            with open(os.path.join(folder_path, file), 'r') as f:
                 json_data = json.load(f)[word]
             
             word_dist_list = list(json_data.items())
@@ -160,8 +159,8 @@ class preprocessing:
                     if dist_info[1][idx2] < dist_threshold:
                         break
                     
-                    real += self.real_review_dict.get(dist_info[0], 0)
-                    fake += self.fake_review_dict.get(dist_info[0], 0)
+                    real_sum += self.real_review_dict.get(dist_info[0], 0)
+                    fake_sum += self.fake_review_dict.get(dist_info[0], 0)
             
             else:
                 word_dist_list.sort(key=lambda x: x[1][idx2])
@@ -169,9 +168,10 @@ class preprocessing:
                     if dist_info[1][idx2] > dist_threshold:
                         break
                     
-                    real += self.real_review_dict.get(dist_info[0], 0)
-                    fake += self.fake_review_dict.get(dist_info[0], 0)
-                     
+                    real_sum += self.real_review_dict.get(dist_info[0], 0)
+                    fake_sum += self.fake_review_dict.get(dist_info[0], 0)
+            
+            diff = abs(real_sum - fake_sum)
             if diff < threshold:
                 not_del_word_set.add(word)
         
@@ -251,8 +251,13 @@ class preprocessing:
         stop_words = set(stopwords.words('english'))
         del_word_list = self.make_del_word_list(ratio_threshold=ratio_threshold)
         
+        
+#         print('check around')
+#         not_del_word_set = self.check_around_words(del_word_list, threshold=ratio_threshold, dist_type=dist_type, dist_threshold=dist_threshold)
+#         del_word_list = set(del_word_list) - not_del_word_set
+        
         print('checking word distance...')
-        dist_word_set = self.dist_del_word(dist_threshold, del_word_list, dist_type=dist_type, folder_path='./json_folder')
+        dist_word_set = self.dist_del_word(del_word_list, dist_type=dist_type, dist_threshold=dist_threshold)
 
         del_word_list = list(stop_words | set(del_word_list) | dist_word_set)
 
