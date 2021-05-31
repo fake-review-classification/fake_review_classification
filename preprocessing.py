@@ -151,7 +151,8 @@ class preprocessing:
             word_dist_list = list(json_data.items())
             real_sum = 0
             fake_sum = 0
-            
+            real_cnt = 0
+            fake_cnt = 0
             
             if idx2 == 0:
                 word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
@@ -159,19 +160,35 @@ class preprocessing:
                     if dist_info[1][idx2] < dist_threshold:
                         break
                     
-                    real_sum += self.real_review_dict.get(dist_info[0], 0)
-                    fake_sum += self.fake_review_dict.get(dist_info[0], 0)
-            
+                    real_value = self.real_review_dict.get(dist_info[0], 0)
+                    fake_valeu = self.fake_review_dict.get(dist_info[0], 0)
+                    
+                    real_sum += real_value
+                    fake_sun += fake_value
+                    
+                    if real_value > fake_value:
+                        real_cnt += 1
+                    else:
+                        fake_cnt += 1
+                    
             else:
                 word_dist_list.sort(key=lambda x: x[1][idx2])
                 for dist_info in word_dist_list:
                     if dist_info[1][idx2] > dist_threshold:
                         break
                     
-                    real_sum += self.real_review_dict.get(dist_info[0], 0)
-                    fake_sum += self.fake_review_dict.get(dist_info[0], 0)
+                    real_value = self.real_review_dict.get(dist_info[0], 0)
+                    fake_valeu = self.fake_review_dict.get(dist_info[0], 0)
+                    
+                    real_sum += real_value
+                    fake_sun += fake_value
+                    
+                    if real_value > fake_value:
+                        real_cnt += 1
+                    else:
+                        fake_cnt += 1
             
-            diff = abs(real_sum - fake_sum)
+            diff = abs(real_cnt - fake_cnt)
             if diff < threshold:
                 not_del_word_set.add(word)
         
