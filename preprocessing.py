@@ -132,7 +132,7 @@ class preprocessing:
             if idx2 == 0:
                 word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
             else:
-                word_dist_list.sort(lambda x: x[1][idx2])
+                word_dist_list.sort(key=lambda x: x[1][idx2])
                 
             for dist_info in word_dist_list:
                 if idx2 == 0:
