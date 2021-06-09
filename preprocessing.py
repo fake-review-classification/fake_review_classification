@@ -64,10 +64,10 @@ class preprocessing:
                         
                     self.all_word_set.add(ele)
             
-        print('save')
-        with open('all_word.json', 'w', encoding='utf-8') as make_file:
-            json.dump({'word': list(self.all_word_set)}, make_file, ensure_ascii=False, indent='\t')
-        print('done')
+#         print('save')
+#         with open('all_word.json', 'w', encoding='utf-8') as make_file:
+#             json.dump({'word': list(self.all_word_set)}, make_file, ensure_ascii=False, indent='\t')
+#         print('done')
                 
 
     def make_del_word_set(self, ratio_threshold):
@@ -129,19 +129,21 @@ class preprocessing:
                 json_data = json.load(f)[word]
 
             word_dist_list = list(json_data.items())
+            
             if idx2 == 0:
                 word_dist_list.sort(reverse=True, key=lambda x: x[1][idx2])
             else:
                 word_dist_list.sort(key=lambda x: x[1][idx2])
                 
             for dist_info in word_dist_list:
-                if idx2 == 0:
+                if idx2 == 0:    
                     if dist_info[1][idx2] < dist_threshold:
                         break
+            
                 else:
                     if dist_info[1][idx2] > dist_threshold:
                         break
-                        
+                
                 add_del_word_set.add(dist_info[0])
 
         return add_del_word_set
@@ -159,10 +161,15 @@ class preprocessing:
         elif dist_type == 'euclidean_distance' or dist_type == 'e':
             idx2 = 1
         
+        file_list = os.listdir(folder_path)
+
         for word in tqdm(word_list):
             
             file = word + '.json'
             
+            if file not in file_list:
+                continue
+
             with open(os.path.join(folder_path, file), 'r') as f:
                 json_data = json.load(f)[word]
             
@@ -289,7 +296,10 @@ class preprocessing:
             print('checking word distance...')
             dist_word_set = self.dist_del_words(list(del_word_set), dist_type=dist_type, dist_threshold=dist_threshold)
             
-            del_word_set = del_word_set | dist_word_set
+            _ = del_word_set
+            del_word_set = (del_word_set | dist_word_set)
+            assert del_word_set != _
+            del _
 
         del_word_list = list(stop_words | del_word_set)
 
